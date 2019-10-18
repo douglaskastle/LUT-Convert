@@ -12,7 +12,7 @@ convert hald:17 identity.png
 Convert it to `cube` format:
 
 ~~~
-python hald_to_cube.py identity.png identity.cube
+python hald_to_cube.py identity.png
 ~~~
 
 [Read the notes.](NOTES.md)
