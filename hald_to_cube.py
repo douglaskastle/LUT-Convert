@@ -1,9 +1,109 @@
-import math
 import sys
+import math
 from optparse import OptionParser
 
 from PIL import Image
 
+from pprint import pprint
+
+
+class Pixel():
+    pass
+
+class Array3D():
+    
+    def __init__(self, size):
+        self.size = size
+        self.entries = self.size**3
+        self.color = None
+        self.x = [[[None for _ in range(self.size)] for _ in range(self.size)] for _ in range(self.size)]
+        self.reset()
+
+    def append(self, y):
+        self.x[self.i][self.j][self.k] = y
+        if None == self.color:
+            if isinstance(y, int):
+                self.color = False
+            else:
+                self.color = True
+        self.increment()    
+    
+    def increment(self):
+        if (self.size-1) == self.k and (self.size-1) == self.j and (self.size-1) == self.i:
+            self.reset()
+        elif (self.size-1) == self.j and (self.size-1) == self.i:
+            self.j = 0
+            self.i = 0
+            self.k += 1
+        elif (self.size-1) == self.i:
+            self.i = 0
+            self.j += 1
+        else:
+            self.i += 1
+    
+    def reset(self):
+        self.i = 0
+        self.j = 0
+        self.k = 0
+    
+    def pop(self):
+        w = self.x[self.i][self.j][self.k]
+        self.increment()
+        return w
+    
+class Hald():
+
+    def __init__(self, infile):
+        self.filename = infile
+        f = Image.open(self.filename)
+        self.w, self.h = f.size
+        print(self.w,self.h)
+        
+        if not self.w == self.h:
+            raise Exception('HALD input is not square.')
+        
+        self.steps = int(round(math.pow(self.w, 1/3)))
+        if not self.steps ** 3 == self.w:
+            raise Exception(f'HALD input size is invalid: {self.w} is not a cube.')
+            
+        self.lut_size = self.steps ** 2
+        self.data = list(f.getdata())
+        
+        self.p = Array3D(self.lut_size)
+        for pixel in self.data:
+            self.p.append(pixel)
+
+        print(self.p.x[0][0])
+    
+    def writeCube(self):
+        
+        name = self.filename.split(".")[0]
+        outcube = f"{name}.cube"
+    
+        print(f'{self.steps} steps -> {self.p.entries} values', file=sys.stderr)
+    
+        # Assume that we are going from 8 bits to 10.
+        out = open(outcube, 'w')
+        out.write('#Created by: hald_to_cube.py\n')
+        #out.write('#Copyright: Copyright 2012 Adobe Systems Inc.\n')
+        out.write(f'TITLE "{self.filename}"\n')
+        out.write('\n')
+        #out.write('#LUT size\n')
+        out.write(f'LUT_3D_SIZE {self.steps ** 2}\n')
+        out.write('\n')
+        #out.write('#data domain\n')
+        out.write('DOMAIN_MIN 0.0 0.0 0.0\n')
+        out.write('DOMAIN_MAX 1.0 1.0 1.0\n')
+
+        for i in range(self.p.entries):
+            pixel = self.p.pop()
+            if self.p.color:
+                r, g, b = pixel[:3]
+            else:
+                r = g = b = pixel
+            #print(pixel)
+            out.write(f'{r / 255.0} {g / 255.0} {b / 255.0}\n')
+        
 def main():
 
     opt_parser = OptionParser(usage='%prog [options] input.[png|tif]')
@@ -14,57 +114,9 @@ def main():
         exit(1)
 
     inimage = args[0]
-    name = inimage.split(".")[0]
-    outcube = f"{name}.cube"
     
-    in_ = Image.open(inimage)
-    w, h = in_.size
-    if not w == h:
-        print('HALD input is not square.', file=sys.stderr)
-        exit(2)
-    
-    steps = int(round(math.pow(w, 1/3)))
-    if not steps ** 3 == w:
-        print(f'HALD input size is invalid: {w} is not a cube.', file=sys.stderr)
-
-    print(f'{steps} steps -> {steps**6} values', file=sys.stderr)
-    
-    # Assume that we are going from 8 bits to 10.
-    out = open(outcube, 'w')
-    out.write('#Created by: hald_to_cube.py\n')
-    #out.write('#Copyright: Copyright 2012 Adobe Systems Inc.\n')
-    out.write(f'TITLE "{args[0]}"\n')
-    out.write('\n')
-    #out.write('#LUT size\n')
-    out.write(f'LUT_3D_SIZE {steps ** 2}\n')
-    out.write('\n')
-    #out.write('#data domain\n')
-    out.write('DOMAIN_MIN 0.0 0.0 0.0\n')
-    out.write('DOMAIN_MAX 1.0 1.0 1.0\n')
-
-    if False:
-        steps1 = steps + 1
-        steps3 = steps ** 2 * (steps + 1)
-        steps5 = steps ** 4 * (steps + 1)
-        data = list(in_.getdata())
-        def lookup(ri, gi, bi):
-            return data[
-                ri * steps1 + gi * steps3 + bi * steps5
-            ]
-        for bi in range(steps):
-            for gi in range(steps):
-                for ri in range(steps):
-                    r, g, b = lookup(ri, gi, bi)[:3]
-                    out.write('%f %f %f\n' % (r / 255.0, g / 255.0, b / 255.0))
-    else:
-        for pixel in list(in_.getdata()):
-            try:
-                r, g, b = pixel[:3]
-                out.write('%f %f %f\n' % (r / 255.0, g / 255.0, b / 255.0))
-            except TypeError:
-                bw = pixel
-                out.write('%f %f %f\n' % (bw / 255.0, bw / 255.0, bw / 255.0))
-
+    h = Hald(inimage)
+    h.writeCube()
 
 if __name__ == '__main__':
     main()
